@@ -1,5 +1,7 @@
 use crate::*;
 
+const CLAUDE_EXEC: &str = "path=(~/.local/bin ~/.claude/local $path); exec claude \"$@\"";
+
 pub(crate) type SharedStdin = Arc<Mutex<Option<ChildStdin>>>;
 
 pub(crate) struct Proc {
@@ -29,7 +31,7 @@ pub(crate) async fn claude_probe(cwd: String, rate: bool) -> Result<String, Stri
         let mut child = Command::new("/bin/zsh")
             .args([
                 "-lc",
-                "exec claude \"$@\"",
+                CLAUDE_EXEC,
                 "claude",
                 "-p",
                 "--output-format",
@@ -74,7 +76,7 @@ pub(crate) async fn claude_probe(cwd: String, rate: bool) -> Result<String, Stri
 pub(crate) async fn claude_oneshot(cwd: String, prompt: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let mut child = Command::new("/bin/zsh")
-            .args(["-lc", "exec claude \"$@\"", "claude"])
+            .args(["-lc", CLAUDE_EXEC, "claude"])
             .args([
                 "-p",
                 "--model",
@@ -111,7 +113,7 @@ pub(crate) fn claude_send(
     message: String,
 ) -> Result<(), String> {
     let mut child = Command::new("/bin/zsh")
-        .args(["-lc", "exec claude \"$@\"", "claude"])
+        .args(["-lc", CLAUDE_EXEC, "claude"])
         .args([
             "-p",
             "--input-format",

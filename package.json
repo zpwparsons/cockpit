@@ -8,6 +8,7 @@
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
+    "release": "./scripts/release.sh",
     "test": "vitest run",
     "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
     "test:all": "vitest run && cargo test --manifest-path src-tauri/Cargo.toml"
