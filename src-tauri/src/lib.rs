@@ -129,6 +129,7 @@ pub fn run() {
             shell::run_command,
             shell::list_files,
             shell::append_file,
+            shell::read_image,
             shell::read_settings,
             sessions::session_rewind
         ])

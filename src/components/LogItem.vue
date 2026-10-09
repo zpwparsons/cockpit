@@ -127,9 +127,9 @@ const pathLines = computed(() =>
     :class="item.permission.state === 'pending' ? 'border-warn/60' : 'border-hair-strong'"
   >
     <div class="flex items-baseline gap-2">
-      <span :class="item.permission.state === 'pending' ? 'dos-blink text-warn' : 'text-paper-faint'">?</span>
-      <span class="text-paper">Claude wants to {{ TOOL_VERB[item.text] ?? "use" }}</span>
-      <span v-if="item.text !== 'ExitPlanMode'" class="text-paper-mute truncate">{{ TOOL_VERB[item.text] ? "" : item.text }} {{ item.meta }}</span>
+      <span class="shrink-0" :class="item.permission.state === 'pending' ? 'dos-blink text-warn' : 'text-paper-faint'">?</span>
+      <span class="text-paper shrink-0 whitespace-nowrap">Claude wants to {{ TOOL_VERB[item.text] ?? "use" }}</span>
+      <span v-if="item.text !== 'ExitPlanMode'" class="text-paper-mute min-w-0 truncate">{{ TOOL_VERB[item.text] ? "" : item.text }} {{ item.meta }}</span>
     </div>
     <div v-if="item.text === 'ExitPlanMode' && planHtml" class="border-hair-strong text-paper-dim mt-2 border-l pl-3" v-html="planHtml" />
     <div v-if="item.permission.state === 'pending'" class="mt-2 flex gap-2 text-[13px]">

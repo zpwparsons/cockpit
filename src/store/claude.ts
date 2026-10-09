@@ -10,6 +10,7 @@ import {
   send as claudeSend,
   sendMore,
   sessions as claudeSessions,
+  setMode,
   stop as claudeStop,
   transcript as claudeTranscript,
   type Block,
@@ -18,6 +19,7 @@ import {
 } from "@/lib/claude";
 import type { Chat, LogLine, Todo } from "@/lib/types";
 import {
+  chat,
   chats,
   EFFORTS,
   ensureRepo,
@@ -92,6 +94,7 @@ export async function startClaude(t: Tab, args: string[]) {
   const ignored: string[] = [];
   let action: "new" | "resume" | "continue" = "new";
   let resumeId = "";
+  let mode = "";
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     const value = () => (args[i + 1] && !args[i + 1].startsWith("-") ? args[++i] : "");
@@ -99,10 +102,11 @@ export async function startClaude(t: Tab, args: string[]) {
     else if (a === "--continue" || a === "-c") action = "continue";
     else if (a === "--model") settings.model = value();
     else if (a === "--effort") settings.effort = value();
-    else if (a === "--permission-mode") settings.mode = value() || settings.mode;
+    else if (a === "--permission-mode") mode = value();
     else if (a.startsWith("-")) ignored.push(a);
     else words.push(a);
   }
+  settings.mode = mode || (await defaultMode(t.cwd));
   if (action === "resume") {
     if (resumeId) await resume(c, resumeId);
     else openResume(t, "shell");
@@ -112,6 +116,15 @@ export async function startClaude(t: Tab, args: string[]) {
   } else if (!runs[c.key]) newSession(c);
   if (ignored.length) log(c.key, "sys", `Ignored ${ignored.join(" ")} — not supported in Cockpit.`);
   if (words.length) ask(c, words.join(" ").replace(/^["']|["']$/g, ""));
+}
+
+async function defaultMode(cwd: string) {
+  const files = isTauri ? await invoke<[string, Record<string, any>][]>("read_settings", { cwd }).catch(() => []) : [];
+  const mode = files
+    .map(([, j]) => j.permissions?.defaultMode)
+    .filter(Boolean)
+    .at(-1);
+  return MODES.some((m) => m.id === mode) ? mode : "manual";
 }
 
 export function addTicket(input: string) {
@@ -332,6 +345,8 @@ export async function rewind(c: Chat, keep: number) {
 export function cycleMode() {
   const i = MODES.findIndex((m) => m.id === settings.mode);
   settings.mode = MODES[(i + 1) % MODES.length].id;
+  const run = chat.value && runs[chat.value.key];
+  if (run) setMode(run.id, settings.mode).catch(() => {});
 }
 
 export async function decide(line: LogLine, decision: Decision, answers?: Record<string, string>) {

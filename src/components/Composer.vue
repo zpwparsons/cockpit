@@ -6,6 +6,7 @@ import { highlight, withCursor } from "@/lib/highlight";
 import { ansi } from "@/lib/ansi";
 import { BUILTINS, EFFORTS, MODELS, MODES, fmtTokens, modelLabel, useCockpit, type Attachment } from "@/composables/useCockpit";
 import { invoke } from "@tauri-apps/api/core";
+import { isTauri } from "@/lib/claude";
 
 const {
   chat,
@@ -107,20 +108,21 @@ const queued = computed(() => (chat.value ? (queue[chat.value.key] ?? []) : []))
 
 function readImage(file: File) {
   const reader = new FileReader();
-  reader.onload = () => {
-    const url = String(reader.result);
-    const img = new Image();
-    img.onload = () => {
-      const scale = Math.min(1, 240 / Math.max(img.width, img.height));
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-      canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
-      attachments.value.push({ type: file.type, data: url.split(",")[1], thumb: canvas.toDataURL("image/jpeg", 0.7) });
-    };
-    img.src = url;
-  };
+  reader.onload = () => attachImage(file.type, String(reader.result));
   reader.readAsDataURL(file);
+}
+
+function attachImage(type: string, url: string) {
+  const img = new Image();
+  img.onload = () => {
+    const scale = Math.min(1, 240 / Math.max(img.width, img.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(img.width * scale);
+    canvas.height = Math.round(img.height * scale);
+    canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+    attachments.value.push({ type, data: url.split(",")[1], thumb: canvas.toDataURL("image/jpeg", 0.7) });
+  };
+  img.src = url;
 }
 
 function onPaste(e: ClipboardEvent) {
@@ -131,9 +133,46 @@ function onPaste(e: ClipboardEvent) {
   files.forEach(readImage);
 }
 
-function onDrop(e: DragEvent) {
-  [...(e.dataTransfer?.files ?? [])].filter((f) => f.type.startsWith("image/")).forEach(readImage);
+const IMAGE_TYPES: Record<string, string> = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp" };
+const quotePath = (p: string) => (/^[\w@%+=:,./~-]+$/.test(p) ? p : `'${p.replaceAll("'", "'\\''")}'`);
+const dragging = ref(false);
+
+function insertText(text: string) {
+  const el = input.value;
+  const at = el?.selectionStart ?? draft.value.length;
+  const before = draft.value.slice(0, at);
+  const pad = before && !/\s$/.test(before) ? " " : "";
+  draft.value = before + pad + text + " " + draft.value.slice(at);
+  nextTick(() => {
+    grow();
+    el?.focus();
+    if (el) el.selectionStart = el.selectionEnd = (before + pad + text + " ").length;
+  });
 }
+
+async function onDropPaths(paths: string[]) {
+  const files: string[] = [];
+  for (const path of paths) {
+    const type = IMAGE_TYPES[path.split(".").pop()?.toLowerCase() ?? ""];
+    if (!type || shell.value) files.push(path);
+    else
+      await invoke<string>("read_image", { path })
+        .then((data) => attachImage(type, `data:${type};base64,${data}`))
+        .catch(() => files.push(path));
+  }
+  if (files.length) insertText(files.map((p) => quotePath(p)).join(" "));
+}
+
+let unlistenDrop: (() => void) | undefined;
+onMounted(async () => {
+  if (!isTauri) return;
+  const { getCurrentWebview } = await import("@tauri-apps/api/webview");
+  unlistenDrop = await getCurrentWebview().onDragDropEvent(({ payload }) => {
+    dragging.value = payload.type === "enter" || payload.type === "over";
+    if (payload.type === "drop") onDropPaths(payload.paths);
+  });
+});
+onBeforeUnmount(() => unlistenDrop?.());
 
 let lastEsc = 0;
 let historyAt = -1;
@@ -625,7 +664,7 @@ defineExpose({ focus: () => input.value?.focus() });
         </Transition>
       </div>
 
-      <div class="border-hair-strong border-y px-5 py-2.5" @dragover.prevent @drop.prevent="onDrop">
+      <div class="border-y px-5 py-2.5 transition-colors" :class="dragging ? 'border-amber/60 bg-amber/5' : 'border-hair-strong'">
         <div v-if="attachments.length" class="mb-2 flex flex-wrap gap-2">
           <div v-for="(a, i) in attachments" :key="i" class="group border-hair-strong relative border">
             <img :src="a.thumb" class="block h-14 w-auto" />

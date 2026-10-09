@@ -178,6 +178,20 @@ describe("entering claude", () => {
     expect(calls("claude_send")).toHaveLength(1);
   });
 
+  it("starts in the defaultMode from claude settings", async () => {
+    s.settings.mode = "plan";
+    invokeResponses.read_settings = () => [
+      ["~/.claude/settings.json", { permissions: { defaultMode: "acceptEdits" } }],
+      ["~/Code/.claude/settings.local.json", { permissions: { defaultMode: "auto" } }],
+    ];
+    await startClaudeChat();
+    expect(s.settings.mode).toBe("auto");
+    invokeResponses.read_settings = () => [["~/.claude/settings.json", { permissions: { defaultMode: "bogus" } }]];
+    s.interruptTab(s.tab.value);
+    await startClaudeChat();
+    expect(s.settings.mode).toBe("manual");
+  });
+
   it("opens the resume screen for --resume and continues the latest for -c", async () => {
     s.runCommand(s.tab.value, "claude --resume");
     await flush();
@@ -259,7 +273,7 @@ describe("talking to claude", () => {
     await s.ask(c, "again");
     const second = JSON.parse(calls("claude_send")[1].args.message as string);
     expect(second.message.content[0].text).toBe("again");
-    expect(calls("claude_send")[1].args.args).toEqual(["--resume", "s1", "--permission-mode", "acceptEdits"]);
+    expect(calls("claude_send")[1].args.args).toEqual(["--resume", "s1", "--permission-mode", "manual"]);
     claudeLine({ type: "result", total_cost_usd: 0.7 });
     expect(s.currentLog.value.at(-1)?.text).toContain("$0.30");
     expect(c.cost).toBe(0.7);
@@ -325,6 +339,16 @@ describe("talking to claude", () => {
     expect(s.currentLog.value.at(-1)?.permission?.state).toBe("expired");
   });
 
+  it("switches the permission mode of a running turn", async () => {
+    const c = await startClaudeChat();
+    s.cycleMode();
+    expect(calls("claude_write")).toHaveLength(0);
+    await s.ask(c, "go");
+    s.cycleMode();
+    const sent = JSON.parse(calls("claude_write")[0].args.line as string);
+    expect(sent).toMatchObject({ type: "control_request", request: { subtype: "set_permission_mode", mode: "plan" } });
+  });
+
   it("steers a running turn, falls back to the queue, and drains it", async () => {
     const c = await startClaudeChat();
     await s.ask(c, "first");
@@ -379,7 +403,8 @@ describe("talking to claude", () => {
     expect(calls("claude_send")).toHaveLength(0);
 
     s.cycleMode();
-    expect(s.settings.mode).toBe("plan");
+    expect(s.settings.mode).toBe("acceptEdits");
+    s.cycleMode();
     s.cycleMode();
     s.cycleMode();
     expect(s.settings.mode).toBe("manual");

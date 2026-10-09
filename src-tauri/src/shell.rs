@@ -221,6 +221,21 @@ pub(crate) async fn list_files(cwd: String, query: String) -> Vec<String> {
 }
 
 #[tauri::command]
+pub(crate) async fn read_image(path: String) -> Result<String, String> {
+    use base64::Engine;
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = expand(&path);
+        if std::fs::metadata(&path).map_err(|e| e.to_string())?.len() > 20_000_000 {
+            return Err("image is larger than 20 MB".into());
+        }
+        let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
+        Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 pub(crate) async fn append_file(path: String, text: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let path = std::path::PathBuf::from(expand(&path));

@@ -220,6 +220,11 @@ export function respond(run: string, req: PermissionRequest, decision: Decision,
   return invoke("claude_write", { run, line });
 }
 
+export function setMode(run: string, mode: string) {
+  const line = JSON.stringify({ type: "control_request", request_id: `mode-${Date.now()}`, request: { subtype: "set_permission_mode", mode } });
+  return invoke("claude_write", { run, line });
+}
+
 export function oneshot(cwd: string, prompt: string) {
   return invoke<string>("claude_oneshot", { cwd, prompt });
 }

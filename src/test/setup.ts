@@ -49,6 +49,15 @@ vi.mock("@tauri-apps/api/event", () => ({
   }),
 }));
 
+vi.mock("@tauri-apps/api/webview", () => ({
+  getCurrentWebview: () => ({
+    onDragDropEvent: async (cb: Listener) => {
+      listeners.set("drag-drop", [...(listeners.get("drag-drop") ?? []), cb]);
+      return () => {};
+    },
+  }),
+}));
+
 vi.mock("@tauri-apps/api/path", () => ({ homeDir: async () => "/Users/test/" }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn(), openPath: vi.fn() }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn(async () => null) }));

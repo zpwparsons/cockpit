@@ -81,12 +81,30 @@ describe("Composer", () => {
     expect(s.settings.model).toBe("opus");
   });
 
+  it("inserts dropped file paths and attaches dropped images", async () => {
+    const w = await mountComposer();
+    await flush();
+    emit("drag-drop", { type: "over", paths: [] });
+    await nextTick();
+    expect(w.find(".border-amber\\/60").exists()).toBe(true);
+    emit("drag-drop", { type: "drop", paths: ["/a/b.txt", "/a/my file.png"] });
+    await flush();
+    expect((w.find("textarea").element as HTMLTextAreaElement).value).toBe("/a/b.txt '/a/my file.png' ");
+    expect(calls("read_image")).toHaveLength(0);
+
+    await enterClaude();
+    invokeResponses.read_image = () => "aGk=";
+    emit("drag-drop", { type: "drop", paths: ["/a/shot.png"] });
+    await flush();
+    expect(calls("read_image")[0].args.path).toBe("/a/shot.png");
+  });
+
   it("cycles the permission mode with shift+tab", async () => {
     await enterClaude();
     const w = await mountComposer();
     await key(w, "textarea", "Tab", { shiftKey: true });
-    expect(s.settings.mode).toBe("plan");
-    expect(w.text()).toContain("plan mode on");
+    expect(s.settings.mode).toBe("acceptEdits");
+    expect(w.text()).toContain("accept edits on");
   });
 
   it("runs ! commands and saves # memories", async () => {

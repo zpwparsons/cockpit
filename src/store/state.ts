@@ -83,7 +83,7 @@ loadLogs();
 window.addEventListener("blur", saveLogs);
 window.addEventListener("beforeunload", saveLogs);
 
-export const settings = reactive({ model: "", effort: "", mode: "acceptEdits", ...read("cockpit.settings.v1", {}) });
+export const settings = reactive({ model: "", effort: "", mode: "manual", ...read("cockpit.settings.v1", {}) });
 persist("cockpit.settings.v1", settings);
 
 export const rate = shallowRef<Rate | null>(read("cockpit.rate.v1", null));
